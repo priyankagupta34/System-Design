@@ -1,0 +1,171 @@
+Apache ZooKeeper is an open-source server that enables highly reliable distributed coordination. It is designed to manage large-scale distributed systems by providing essential services that help coordinate distributed applications and maintain configuration information.
+
+### Key Responsibilities of ZooKeeper
+
+1. **Configuration Management**:
+   - Centralized storage of configuration data for distributed applications.
+   - Ensures all nodes in a distributed system have a consistent view of the configuration data.
+   - Facilitates dynamic updates to configuration settings without restarting the application.
+
+2. **Naming Service**:
+   - Provides a centralized naming registry for distributed applications.
+   - Ensures that components can discover and communicate with each other using standardized names.
+
+3. **Distributed Synchronization**:
+   - Manages distributed locks, ensuring that only one process can access a shared resource at a time.
+   - Coordinates the execution of critical sections of code in distributed applications.
+   - Supports leader election protocols to coordinate task execution among nodes.
+
+4. **Cluster Management**:
+   - Monitors the health and status of nodes in a cluster.
+   - Provides mechanisms for nodes to register their presence and track the availability of services.
+   - Detects node failures and helps distributed systems handle failover scenarios.
+
+5. **Leader Election**:
+   - Manages the election of a leader node in distributed systems.
+   - Ensures a single leader is elected to coordinate tasks or manage resources.
+   - Facilitates consensus among nodes
+
+Apache ZooKeeper is a distributed coordination service for distributed applications. It is designed to manage and coordinate large-scale distributed systems by providing a set of essential services. Here are the key responsibilities and functionalities of ZooKeeper:
+
+### Key Responsibilities of ZooKeeper
+
+1. **Configuration Management**:
+   - **Centralized Configuration Storage**: ZooKeeper stores configuration data in a centralized location, ensuring consistency across all nodes in a distributed system.
+   - **Dynamic Updates**: Configuration settings can be updated dynamically without restarting the entire application, and all nodes can pick up these changes in real-time.
+
+2. **Naming Service**:
+   - **Centralized Naming Registry**: ZooKeeper acts as a centralized naming registry, allowing distributed components to discover and communicate with each other using standardized names.
+   - **Service Discovery**: Nodes can register themselves with ZooKeeper, and other nodes can discover these services by querying ZooKeeper.
+
+3. **Distributed Synchronization**:
+   - **Distributed Locks**: ZooKeeper provides mechanisms for implementing distributed locks, ensuring that only one process can access a shared resource at any given time.
+   - **Coordination**: It helps coordinate tasks among distributed components, preventing race conditions and ensuring data consistency.
+
+4. **Cluster Management**:
+   - **Node Management**: ZooKeeper keeps track of the status and health of nodes in a cluster. Nodes can register their presence, and ZooKeeper monitors their availability.
+   - **Failure Detection**: ZooKeeper detects node failures and helps distributed systems handle failover scenarios, ensuring high availability and reliability.
+
+5. **Leader Election**:
+   - **Leader Election Algorithms**: ZooKeeper provides built-in algorithms for leader election, ensuring a single leader is chosen among distributed nodes to coordinate tasks or manage resources.
+   - **Consensus Building**: It helps in building consensus among nodes for electing a leader and coordinating activities.
+
+### Core Concepts in ZooKeeper
+
+1. **Znodes**:
+   - **Data Nodes**: The primary data structure in ZooKeeper is called a znode, which is similar to a file but can also act like a directory containing other znodes.
+   - **Hierarchical Namespace**: Znodes form a hierarchical namespace similar to a filesystem, where each znode is identified by a unique path.
+
+2. **Sessions**:
+   - **Client Sessions**: When a client connects to a ZooKeeper server, a session is created. This session remains active as long as the client is connected.
+   - **Ephemeral Nodes**: These are special types of znodes that are tied to a client's session and are automatically deleted when the session ends.
+
+3. **Watches**:
+   - **Event Notifications**: Clients can set watches on znodes to receive notifications about changes to the data or the structure of the znode. Watches are one-time triggers and need to be re-established after they are fired.
+
+### Use Cases of ZooKeeper
+
+1. **Service Discovery**:
+   - ZooKeeper can be used to register services in a distributed system, allowing clients to discover available services and their endpoints.
+
+2. **Configuration Management**:
+   - Store configuration settings centrally and ensure all nodes have consistent configuration information, which can be dynamically updated.
+
+3. **Leader Election**:
+   - Implement leader election algorithms to ensure that only one node acts as the leader for a specific task, improving coordination and reducing conflicts.
+
+4. **Distributed Locking**:
+   - Use ZooKeeper to implement distributed locks, ensuring mutual exclusion and preventing race conditions in accessing shared resources.
+
+5. **Metadata Management**:
+   - Manage and store metadata about distributed components, including their status, health, and availability.
+
+### Example: Using ZooKeeper for Leader Election
+
+Here's a simplified example of how ZooKeeper can be used for leader election in a Java application:
+
+1. **Maven Dependencies**:
+   Add ZooKeeper dependencies to your `pom.xml`:
+
+   ```xml
+   <dependency>
+       <groupId>org.apache.zookeeper</groupId>
+       <artifactId>zookeeper</artifactId>
+       <version>3.6.3</version>
+   </dependency>
+   ```
+
+2. **Leader Election Code**:
+   Implement leader election logic using ZooKeeper.
+
+   ```java
+   import org.apache.zookeeper.*;
+   import org.apache.zookeeper.data.Stat;
+
+   import java.io.IOException;
+   import java.util.Collections;
+   import java.util.List;
+
+   public class LeaderElection implements Watcher {
+       private static final String ELECTION_NAMESPACE = "/election";
+       private final ZooKeeper zooKeeper;
+       private String currentZnodeName;
+
+       public LeaderElection(ZooKeeper zooKeeper) {
+           this.zooKeeper = zooKeeper;
+       }
+
+       public void volunteerForLeadership() throws KeeperException, InterruptedException {
+           String znodePrefix = ELECTION_NAMESPACE + "/c_";
+           String znodeFullPath = zooKeeper.create(znodePrefix, new byte[]{}, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+           currentZnodeName = znodeFullPath.replace(ELECTION_NAMESPACE + "/", "");
+       }
+
+       public void reelectLeader() throws KeeperException, InterruptedException {
+           Stat predecessorStat = null;
+           String predecessorZnodeName = "";
+           while (predecessorStat == null) {
+               List<String> children = zooKeeper.getChildren(ELECTION_NAMESPACE, false);
+               Collections.sort(children);
+               String smallestChild = children.get(0);
+
+               if (smallestChild.equals(currentZnodeName)) {
+                   System.out.println("I am the leader");
+                   return;
+               } else {
+                   System.out.println("I am not the leader. " + smallestChild + " is the leader");
+                   int predecessorIndex = Collections.binarySearch(children, currentZnodeName) - 1;
+                   predecessorZnodeName = children.get(predecessorIndex);
+                   predecessorStat = zooKeeper.exists(ELECTION_NAMESPACE + "/" + predecessorZnodeName, this);
+               }
+           }
+           System.out.println("Watching znode " + predecessorZnodeName);
+       }
+
+       @Override
+       public void process(WatchedEvent event) {
+           switch (event.getType()) {
+               case NodeDeleted:
+                   try {
+                       reelectLeader();
+                   } catch (KeeperException | InterruptedException e) {
+                       e.printStackTrace();
+                   }
+           }
+       }
+
+       public static void main(String[] args) throws IOException, KeeperException, InterruptedException {
+           ZooKeeper zooKeeper = new ZooKeeper("localhost:2181", 3000, new LeaderElection(null));
+           LeaderElection leaderElection = new LeaderElection(zooKeeper);
+           leaderElection.volunteerForLeadership();
+           leaderElection.reelectLeader();
+           Thread.sleep(Long.MAX_VALUE);
+       }
+   }
+   ```
+
+In this example, the `LeaderElection` class uses ZooKeeper to create ephemeral sequential znodes for leader election. It monitors the znodes to determine the current leader and re-elect a new leader if the current leader node is deleted.
+
+### Conclusion
+
+ZooKeeper is a powerful tool for managing distributed systems, providing essential services like configuration management, naming, distributed synchronization, cluster management, and leader election. Its ability to maintain consistency and coordinate activities among distributed components makes it an integral part of many large-scale distributed systems.
